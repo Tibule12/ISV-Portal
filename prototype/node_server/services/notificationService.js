@@ -1,5 +1,4 @@
 const graphClient = require('./msGraphClient');
-require('dotenv').config({ path: './config.env' });
 
 async function sendTeamsNotification(changeRequest) {
     try {

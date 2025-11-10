@@ -1,7 +1,6 @@
 const { ClientSecretCredential } = require('@azure/identity');
 const { Client } = require('@microsoft/microsoft-graph-client');
 const { TokenCredentialAuthenticationProvider } = require('@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials');
-require('dotenv').config({ path: './config.env' });
 
 // Initialize Microsoft Graph client
 const credential = new ClientSecretCredential(

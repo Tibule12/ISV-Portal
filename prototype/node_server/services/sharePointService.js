@@ -1,6 +1,5 @@
 const { spfi } = require('@pnp/sp');
 const { SPFx } = require('@pnp/sp/behaviors/spfx');
-require('dotenv').config({ path: './config.env' });
 
 const sp = spfi(process.env.SHAREPOINT_SITE_URL).using(SPFx());
 
