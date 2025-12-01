@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ISV Change Control Portal - Prototype</title>
+  <title>ISV Portal- Prototype</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -16,12 +16,9 @@
     <section id="submission">
       <h2>Submit Change Request</h2>
       <form id="requestForm">
-        <label>Request Title<br><input required name="title" /></label>
-        <label>Requested By<br><input required name="requestedBy" placeholder="Name of requester" /></label>
-        <label>Date Requested<br><input required name="dateRequested" type="date" /></label>
-        <label>Requestor Email<br><input required name="requestorEmail" type="email" /></label>
+        <label>Request Title<br><input required name="Title" /></label>
         <label>Department<br>
-          <select name="department">
+          <select name="Department">
             <option>Information Systems</option>
             <option>Validation</option>
             <option>Human Resources</option>
@@ -40,10 +37,9 @@
             <option>Other</option>
           </select>
         </label>
-        <label>Summary<br><input required name="summary" /></label>
-  <label>Description (details)<br><textarea name="description"></textarea></label>
+        <label>Description (details)<br><textarea name="Description"></textarea></label>
         <label>Change Type<br>
-          <select name="changeType">
+          <select name="ChangeType">
             <option>Bug Fix</option>
             <option>Enhancement</option>
             <option>Config Change</option>
@@ -52,20 +48,20 @@
           </select>
         </label>
         <label>Priority<br>
-          <select name="priority">
+          <select name="Priority">
             <option>Low</option>
             <option selected>Medium</option>
             <option>High</option>
             <option>Critical</option>
           </select>
         </label>
-        <label>Target Implementation Date<br><input type="date" name="targetDate" /></label>
-        <label>Documents (URL)<br><input name="documents" placeholder="OneDrive / SharePoint link" /></label>
-        <label>Spice Wax Reference<br><input name="spiceWaxRef" /></label>
+        <label>Target Implementation Date<br><input type="date" name="TargetDate" /></label>
+        <label>Documents (URL)<br><input name="Documents" placeholder="OneDrive / SharePoint link" /></label>
+        <label>Spice Wax Reference<br><input name="SpiceWaxRef" /></label>
         <fieldset style="margin-top:8px;padding:8px;border:1px solid #ddd">
           <legend>Change information</legend>
           <label>Select system<br>
-            <select name="systemName" id="systemNameSelect">
+            <select name="SystemName" id="systemNameSelect">
               <option value="">-- choose or type --</option>
               <option>Core Billing</option>
               <option>Customer Portal</option>
@@ -75,12 +71,10 @@
             </select>
           </label>
           <label id="otherSystemLabel" style="display:none">If not present, type system name<br><input name="systemNameOther" id="systemNameOther" /></label>
-          <label style="display:block;margin-top:8px">Initiator<br><input name="initiator" /></label>
           <div style="margin-top:8px">
-            <label><input type="checkbox" name="policyFormComplete" value="1" /> User completed policy form</label><br>
-            <label><input type="checkbox" name="sopTrainingComplete" value="1" /> User received appropriate SOP training</label>
+            <label><input type="checkbox" name="PolicyFormComplete" value="true" /> User completed policy form</label><br>
+            <label><input type="checkbox" name="SOPTrainingComplete" value="true" /> User received appropriate SOP training</label>
           </div>
-          <label style="display:block;margin-top:8px">Please provide a brief description of the request<br><textarea name="briefDescription"></textarea></label>
         </fieldset>
         <div class="actions">
           <button type="submit">Submit Request</button>

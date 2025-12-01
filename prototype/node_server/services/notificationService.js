@@ -1,42 +1,26 @@
-const graphClient = require('./msGraphClient');
+const nodemailer = require('nodemailer');
 
-async function sendTeamsNotification(changeRequest) {
-    try {
-        const message = {
-            body: {
-                content: `New change request: ${changeRequest.title}\nStatus: ${changeRequest.status}\nPriority: ${changeRequest.priority}`
-            }
-        };
-
-        await graphClient.api(`/teams/${process.env.TEAMS_TEAM_ID}/channels/${process.env.TEAMS_CHANNEL_ID}/messages`)
-            .post(message);
-    } catch (error) {
-        console.error('Error sending Teams notification:', error);
-        throw error;
+const transport = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: process.env.SMTP_PORT,
+    secure: process.env.SMTP_SECURE === 'true', // Use true for 465, false for other ports
+    auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
     }
-}
+});
 
 async function sendEmailNotification({ to, subject, body }) {
     try {
-        const mail = {
-            message: {
-                subject: subject,
-                body: {
-                    contentType: "Text",
-                    content: body
-                },
-                toRecipients: [
-                    {
-                        emailAddress: {
-                            address: to
-                        }
-                    }
-                ]
-            }
+        const mailOptions = {
+            from: process.env.SMTP_FROM_EMAIL,
+            to: to,
+            subject: subject,
+            text: body
         };
 
-        await graphClient.api('/me/sendMail')
-            .post(mail);
+        await transport.sendMail(mailOptions);
+        console.log('Email notification sent successfully.');
     } catch (error) {
         console.error('Error sending email notification:', error);
         throw error;
@@ -44,6 +28,5 @@ async function sendEmailNotification({ to, subject, body }) {
 }
 
 module.exports = {
-    sendTeamsNotification,
     sendEmailNotification
 };

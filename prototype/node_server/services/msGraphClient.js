@@ -1,20 +1,4 @@
-const { ClientSecretCredential } = require('@azure/identity');
-const { Client } = require('@microsoft/microsoft-graph-client');
-const { TokenCredentialAuthenticationProvider } = require('@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials');
-
-// Initialize Microsoft Graph client
-const credential = new ClientSecretCredential(
-    process.env.TENANT_ID,
-    process.env.CLIENT_ID,
-    process.env.CLIENT_SECRET
-);
-
-const authProvider = new TokenCredentialAuthenticationProvider(credential, {
-    scopes: ['https://graph.microsoft.com/.default']
-});
-
-const graphClient = Client.init({
-    authProvider: authProvider
-});
-
-module.exports = graphClient;
+// This file is currently not in use.
+// It was originally intended for Microsoft Graph API integration, which relies on Azure Active Directory.
+// As the current setup focuses on on-premise SharePoint with FCC Active Directory, this client is not needed.
+// If SharePoint Online integration becomes a requirement in the future, this file can be re-evaluated and configured with appropriate Azure AD settings.

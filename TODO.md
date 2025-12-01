@@ -1,8 +1,16 @@
-# TODO: Complete User Dashboard
+# Change Control Portal - SharePoint Online Deployment Tasks
 
-## 1. Update User Dashboard
-- [x] Remove summary cards from user_dashboard.html.
-- [x] Ensure welcome banner and personalization remain.
+-## Pending Tasks
+- [ ] Set up Azure App Service for hosting the Node.js server (optional)
+- [x] Create SPFx web part to embed or integrate the app
+- [x] Update SPFx web part to fetch from SharePoint list instead of an external backend (completed)
+  
+- [ ] Configure CORS and authentication for SharePoint integration
+- [ ] Build and deploy SPFx solution to SharePoint app catalog
+- [ ] Test the deployed solution in SharePoint Online
+- [ ] Update documentation with deployment instructions
+- [x] Add docs for a SharePoint-only (no Azure) deployment
 
-## 2. Testing
-- [x] Test user dashboard without summary cards, with welcome banner and personalization.
+## Completed Tasks
+- [x] Fixed syntax errors in sharePointService.js
+- [x] Deployed Node.js server locally with PM2

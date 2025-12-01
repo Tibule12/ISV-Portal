@@ -6,17 +6,39 @@ const bodyParser = require('body-parser');
 const sqlite3 = require('sqlite3').verbose();
 const fs = require('fs');
 const cors = require('cors');
-const multer = require('multer');
-
-// Import services
-const sharePointService = require('./services/sharePointService');
+let sharePointService;
+try {
+  sharePointService = require('./services/sharePointService');
+} catch (e) {
+  // If sharePointService can't load (e.g., missing credentials), we'll run in mock mode
+  sharePointService = null;
+}
 const notificationService = require('./services/notificationService');
 const oneDriveService = require('./services/oneDriveService');
+const multer = require('multer');
 
 const DB_FILE = path.join(__dirname, 'requests.db');
 const staticDir = path.join(__dirname, 'node_demo');
 const app = express();
-app.use(cors());
+
+// Add rate limiting to all API requests
+const rateLimit = require('express-rate-limit');
+const limiter = rateLimit({
+	windowMs: 15 * 60 * 1000, // 15 minutes
+	max: 100, // Limit each IP to 100 requests per windowMs
+	standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+	legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+});
+app.use('/api', limiter);
+
+
+// Configure CORS to only allow requests from your SharePoint domain
+const corsOptions = {
+  origin: process.env.SHAREPOINT_SITE_URL || 'http://fccvsp02', // Default for safety
+  optionsSuccessStatus: 200 // For legacy browser support
+};
+app.use(cors(corsOptions));
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -68,10 +90,21 @@ db.serialize(() => {
 // Serve the static demo client with welcome.html as the default index
 app.use('/', express.static(staticDir, { index: 'welcome.html' }));
 
+const NO_SHAREPOINT = (process.env.NO_SHAREPOINT || 'false').toLowerCase() === 'true';
+
 // API: create request
 app.post('/api/requests', async (req, res) => {
   try {
     const r = req.body;
+
+    // Server-side validation for required fields
+    const requiredFields = ['title', 'requestorName', 'requestorEmail', 'department', 'summary', 'description', 'changeType', 'priority', 'targetDate'];
+    for (const field of requiredFields) {
+      if (!r[field]) {
+        return res.status(400).json({ error: `Missing required field: ${field}` });
+      }
+    }
+
     const stmt = db.prepare(`INSERT INTO requests (requestId,title,requestorName,requestorEmail,department,summary,description,changeType,priority,targetDate,documents,spiceWaxRef,status,assignedTo,reviewer,submittedDate,comments,initiator,requestedBy,dateRequested,systemName,policyFormComplete,sopTrainingComplete,briefDescription) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
     const requestId = r.requestId || ('REQ-' + Date.now().toString().slice(-6));
     const vals = [requestId, r.title, r.requestorName, r.requestorEmail, r.department, r.summary, r.description, r.changeType, r.priority, r.targetDate, r.documents, r.spiceWaxRef, r.status || 'Pending', r.assignedTo || '', r.reviewer || '', r.submittedDate || new Date().toISOString(), r.comments || '', r.initiator || '', r.requestedBy || r.requestorName || '', r.dateRequested || r.submittedDate || new Date().toISOString(), r.systemName || '', r.policyFormComplete?1:0, r.sopTrainingComplete?1:0, r.briefDescription || ''];
@@ -79,35 +112,55 @@ app.post('/api/requests', async (req, res) => {
     stmt.run(vals, async function(err){
       if(err) return res.status(500).json({error:err.message});
 
-      // Sync to SharePoint
-      try {
-        await sharePointService.createChangeRequest({
-          title: r.title,
-          requestId: requestId,
-          requestorName: r.requestorName,
-          requestorEmail: r.requestorEmail,
-          department: r.department,
-          summary: r.summary,
-          description: r.description,
-          changeType: r.changeType,
-          priority: r.priority,
-          status: r.status || 'Pending',
-          submittedDate: r.submittedDate || new Date().toISOString()
-        });
-      } catch (spError) {
-        console.error('SharePoint sync failed:', spError);
-        // Continue with response even if SharePoint fails
+      // Sync to SharePoint if available and not explicitly disabled
+      if (!NO_SHAREPOINT && sharePointService) {
+        try {
+          await sharePointService.createChangeRequest({
+            title: r.title,
+            requestId: requestId,
+            requestorName: r.requestorName,
+            requestorEmail: r.requestorEmail,
+            department: r.department,
+            summary: r.summary,
+            description: r.description,
+            changeType: r.changeType,
+            priority: r.priority,
+            status: r.status || 'Pending',
+            submittedDate: r.submittedDate || new Date().toISOString()
+          });
+        } catch (spError) {
+          console.error('SharePoint sync failed:', spError);
+          // Continue with response even if SharePoint fails
+        }
+      } else {
+        if (!sharePointService) {
+          console.log('SharePoint service not loaded; running in local-only mode');
+        }
+        if (NO_SHAREPOINT) {
+          console.log('NO_SHAREPOINT=true; skipping SharePoint sync');
+        }
       }
 
-      // Send Teams notification
+      // Send Email notification
       try {
-        await notificationService.sendTeamsNotification({
-          title: r.title,
-          status: r.status || 'Pending',
-          priority: r.priority
+        const emailSubject = `Change Request ${r.requestId || 'New'} - ${r.title} (${r.status || 'Pending'})`;
+        const emailBody = `A new change request has been ${r.status ? r.status.toLowerCase() : 'submitted'}.\n\n` +
+                          `Title: ${r.title}\n` +
+                          `Request ID: ${r.requestId || 'N/A'}\n` +
+                          `Requestor: ${r.requestorName || 'N/A'}\n` +
+                          `Department: ${r.department || 'N/A'}\n` +
+                          `Priority: ${r.priority || 'N/A'}\n` +
+                          `Status: ${r.status || 'Pending'}\n` +
+                          `Summary: ${r.summary || 'N/A'}\n\n` +
+                          `Please review the change request in the portal.`;
+
+        await notificationService.sendEmailNotification({
+          to: r.requestorEmail, // Or a designated notification email address
+          subject: emailSubject,
+          body: emailBody
         });
-      } catch (teamsError) {
-        console.error('Teams notification failed:', teamsError);
+      } catch (emailError) {
+        console.error('Email notification failed:', emailError);
         // Continue with response even if notification fails
       }
 
@@ -252,173 +305,5 @@ app.get('/api/documents/:requestId', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
-// Power Automate Integration Endpoints
-
-// Webhook endpoint for Power Automate approval notifications
-app.post('/api/webhooks/powerautomate/approval', async (req, res) => {
-  try {
-    const { requestId, outcome, approver, comments } = req.body;
-
-    // Update request status based on approval outcome
-    const status = outcome === 'Approve' ? 'Approved' : 'Rejected';
-
-    // Update in database
-    db.run(`UPDATE requests SET status=?, comments=? WHERE requestId=?`,
-      [status, comments || '', requestId], async function(err) {
-        if (err) {
-          console.error('Database update failed:', err);
-          return res.status(500).json({ error: err.message });
-        }
-
-        // Sync to SharePoint
-        try {
-          await sharePointService.updateChangeRequest(requestId, {
-            Status: status,
-            Comments: comments || ''
-          });
-        } catch (spError) {
-          console.error('SharePoint sync failed:', spError);
-        }
-
-        // Send notification to requestor
-        try {
-          const request = await new Promise((resolve, reject) => {
-            db.get(`SELECT * FROM requests WHERE requestId=?`, [requestId], (err, row) => {
-              if (err) reject(err);
-              else resolve(row);
-            });
-          });
-
-          await notificationService.sendEmailNotification({
-            to: request.requestorEmail,
-            subject: `Change Request ${requestId} ${status}`,
-            body: `Your change request "${request.title}" has been ${status.toLowerCase()}.${comments ? `\n\nComments: ${comments}` : ''}`
-          });
-        } catch (emailError) {
-          console.error('Email notification failed:', emailError);
-        }
-
-        res.json({ success: true, changes: this.changes });
-      });
-  } catch (error) {
-    console.error('Approval webhook error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Endpoint for Power Automate to trigger implementation status
-app.post('/api/powerautomate/implement/:requestId', async (req, res) => {
-  try {
-    const requestId = req.params.requestId;
-
-    // Update status to Implemented
-    db.run(`UPDATE requests SET status='Implemented' WHERE requestId=?`,
-      [requestId], async function(err) {
-        if (err) {
-          console.error('Database update failed:', err);
-          return res.status(500).json({ error: err.message });
-        }
-
-        // Sync to SharePoint
-        try {
-          await sharePointService.updateChangeRequest(requestId, {
-            Status: 'Implemented'
-          });
-        } catch (spError) {
-          console.error('SharePoint sync failed:', spError);
-        }
-
-        res.json({ success: true, changes: this.changes });
-      });
-  } catch (error) {
-    console.error('Implementation trigger error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Power Apps Integration Endpoints
-
-// Endpoint for Power Apps to submit change requests directly
-app.post('/api/powerapps/submit', async (req, res) => {
-  try {
-    const r = req.body;
-
-    // Create in database
-    const stmt = db.prepare(`INSERT INTO requests (requestId,title,requestorName,requestorEmail,department,summary,description,changeType,priority,targetDate,documents,spiceWaxRef,status,assignedTo,reviewer,submittedDate,comments,initiator,requestedBy,dateRequested,systemName,policyFormComplete,sopTrainingComplete,briefDescription) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
-    const requestId = r.requestId || ('REQ-' + Date.now().toString().slice(-6));
-    const vals = [requestId, r.title, r.requestorName, r.requestorEmail, r.department, r.summary, r.description, r.changeType, r.priority, r.targetDate, r.documents, r.spiceWaxRef, r.status || 'Pending', r.assignedTo || '', r.reviewer || '', r.submittedDate || new Date().toISOString(), r.comments || '', r.initiator || '', r.requestedBy || r.requestorName || '', r.dateRequested || r.submittedDate || new Date().toISOString(), r.systemName || '', r.policyFormComplete?1:0, r.sopTrainingComplete?1:0, r.briefDescription || ''];
-
-    stmt.run(vals, async function(err){
-      if(err) return res.status(500).json({error:err.message});
-
-      // Sync to SharePoint
-      try {
-        await sharePointService.createChangeRequest({
-          title: r.title,
-          requestId: requestId,
-          requestorName: r.requestorName,
-          requestorEmail: r.requestorEmail,
-          department: r.department,
-          summary: r.summary,
-          description: r.description,
-          changeType: r.changeType,
-          priority: r.priority,
-          status: r.status || 'Pending',
-          submittedDate: r.submittedDate || new Date().toISOString()
-        });
-      } catch (spError) {
-        console.error('SharePoint sync failed:', spError);
-      }
-
-      // Send Teams notification
-      try {
-        await notificationService.sendTeamsNotification({
-          title: r.title,
-          status: r.status || 'Pending',
-          priority: r.priority
-        });
-      } catch (teamsError) {
-        console.error('Teams notification failed:', teamsError);
-      }
-
-      res.json({id: this.lastID, requestId});
-    });
-    stmt.finalize();
-  } catch (error) {
-    console.error('Power Apps submit error:', error);
-    res.status(500).json({error: error.message});
-  }
-});
-
-// Endpoint for Power Apps to get form data/options
-app.get('/api/powerapps/formdata', (req, res) => {
-  const formData = {
-    departments: ["Information Systems","Validation","Human Resources","Finance","Regulatory Affairs","Procurement","Operational Health and Safety","Commercial","Quality Assurance","Quality Control","Production","Engineering","Research and Development","Analytical Development","Supply Chain","Other"],
-    changeTypes: ["Bug Fix","Enhancement","Config Change","Hotfix","Other"],
-    priorities: ["Low","Medium","High","Critical"],
-    systems: ["Core System","Validation System","QA System","Other"]
-  };
-  res.json(formData);
-});
-
-// Endpoint for Power Apps to upload attachments
-app.post('/api/powerapps/upload/:requestId', upload.single('file'), async (req, res) => {
-  try {
-    const requestId = req.params.requestId;
-    const file = req.file;
-
-    if (!file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-
-    const result = await oneDriveService.uploadDocument(file, requestId);
-    res.json({ success: true, fileId: result.id, fileName: file.originalname });
-  } catch (error) {
-    console.error('Power Apps upload failed:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, ()=>console.log('Server started on http://localhost:'+PORT));

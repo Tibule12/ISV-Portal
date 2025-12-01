@@ -1,0 +1,34 @@
+name: Deploy static prototype to Azure Static Web Apps
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+
+      - name: Build (noop for simple static files)
+        run: echo "No build step for raw static prototyping files"
+
+      - name: Azure Static Web Apps Deploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }} # used for PR comments
+          action: 'upload'
+          ####
+          # Set the following to match your project layout
+          ####
+          app_location: 'prototype' # where app's code is located
+          api_location: ''
+          output_location: ''

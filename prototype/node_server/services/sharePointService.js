@@ -1,31 +1,38 @@
-const axios = require('axios');
-const https = require('https');
-const httpntlm = require('httpntlm');
+require('dotenv').config({ path: './config.env' });
+require('isomorphic-fetch');
 
-// SharePoint REST API configuration for on-premises
-const SHAREPOINT_CONFIG = {
-    siteUrl: process.env.SHAREPOINT_SITE_URL || 'https://your-sharepoint-server/sites/changecontrol',
-    listName: process.env.SHAREPOINT_LIST_NAME || 'ISV Change Requests',
-    username: process.env.SHAREPOINT_USERNAME,
-    password: process.env.SHAREPOINT_PASSWORD,
-    domain: process.env.SHAREPOINT_DOMAIN
-};
+const { spfi, SPDefault } = require('@pnp/sp');
+const { SPFetchClient } = require('@pnp/nodejs-commonjs');
+const { ClientSecretCredential } = require('@azure/identity');
 
-// Note: spClient is kept for potential future use but not currently used
-// since all functions now use httpntlm directly for NTLM authentication
+const onlineSiteUrl = process.env.SHAREPOINT_ONLINE_SITE_URL;
+const clientId = process.env.SHAREPOINT_ONLINE_CLIENT_ID;
+const clientSecret = process.env.SHAREPOINT_ONLINE_CLIENT_SECRET;
+const tenantId = process.env.SHAREPOINT_ONLINE_TENANT_ID;
+const listName = process.env.SHAREPOINT_ONLINE_LIST_NAME || 'ISV Change Requests';
 
-// Authenticate with SharePoint using NTLM
-async function authenticate() {
-    // NTLM authentication is handled per request using httpntlm library
-    // No pre-configuration needed here
+if (!onlineSiteUrl || !clientId || !clientSecret || !tenantId) {
+    throw new Error('SharePoint Online configuration missing. Please check environment variables for SHAREPOINT_ONLINE_*');
 }
 
+const credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
+const sp = spfi(onlineSiteUrl).using(SPFetchClient(onlineSiteUrl, clientId, clientSecret));
+
+// Example function to test connection to SharePoint Online
+async function testConnection() {
+    try {
+        const web = await sp.web();
+        return { success: true, message: 'Connected to SharePoint Online', webTitle: web.Title };
+    } catch (error) {
+        console.error('SharePoint Online connection error:', error.message);
+        return { success: false, message: error.message };
+    }
+}
+
+// Create change request in SharePoint Online list
 async function createChangeRequest(data) {
     try {
-        const url = `${SHAREPOINT_CONFIG.siteUrl}/_api/web/lists/getbytitle('${SHAREPOINT_CONFIG.listName}')/items`;
-
-        const requestData = {
-            __metadata: { type: 'SP.Data.ISVChangeRequestsListItem' },
+        const itemData = {
             Title: data.title,
             RequestID: data.requestId,
             RequestorName: data.requestorName,
@@ -35,251 +42,88 @@ async function createChangeRequest(data) {
             Description: data.description,
             ChangeType: data.changeType,
             Priority: data.priority,
-            Status: "Pending",
-            SubmittedDate: new Date().toISOString()
+            Status: data.status || 'Pending',
+            SubmittedDate: data.submittedDate || new Date().toISOString(),
+            TargetDate: data.targetDate,
+            Documents: data.documents,
+            SpiceWaxRef: data.spiceWaxRef,
+            Comments: data.comments,
+            RequestedBy: data.requestedBy,
+            DateRequested: data.dateRequested,
+            Initiator: data.initiator,
+            SystemName: data.systemName,
+            PolicyFormComplete: data.policyFormComplete ? true : false,
+            SOPTrainingComplete: data.sopTrainingComplete ? true : false,
+            BriefDescription: data.briefDescription
         };
 
-        const response = await new Promise((resolve, reject) => {
-            httpntlm.post({
-                url: url,
-                username: SHAREPOINT_CONFIG.username,
-                password: SHAREPOINT_CONFIG.password,
-                domain: SHAREPOINT_CONFIG.domain,
-                headers: {
-                    'Accept': 'application/json;odata=verbose',
-                    'Content-Type': 'application/json;odata=verbose'
-                },
-                body: JSON.stringify(requestData),
-                rejectUnauthorized: false
-            }, (err, res) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(res);
-                }
-            });
-        });
-
-        if (!response || !response.body) {
-            throw new Error('No response body received from SharePoint');
-        }
-
-        const responseBody = JSON.parse(response.body);
-        return {
-            id: responseBody.d.Id,
-            ...responseBody.d
-        };
+        const result = await sp.web.lists.getByTitle(listName).items.add(itemData);
+        console.log('SharePoint Online: Created change request:', result.data.Id);
+        return { success: true, itemId: result.data.Id, requestId: data.requestId };
     } catch (error) {
-        console.error('Error creating SharePoint item:', error);
+        console.error('SharePoint Online createChangeRequest error:', error.message);
         throw error;
     }
 }
 
-async function updateChangeRequest(id, data) {
+// Update change request in SharePoint Online list by RequestID
+async function updateChangeRequest(requestId, data) {
     try {
-        const url = `${SHAREPOINT_CONFIG.siteUrl}/_api/web/lists/getbytitle('${SHAREPOINT_CONFIG.listName}')/items(${id})`;
+        const items = await sp.web.lists.getByTitle(listName).items.filter(`RequestID eq '${requestId}'`).get();
 
-        const updateData = {
-            __metadata: { type: 'SP.Data.ISVChangeRequestsListItem' },
-            ...data
-        };
-
-        const response = await new Promise((resolve, reject) => {
-            httpntlm.post({
-                url: url,
-                username: SHAREPOINT_CONFIG.username,
-                password: SHAREPOINT_CONFIG.password,
-                domain: SHAREPOINT_CONFIG.domain,
-                headers: {
-                    'Accept': 'application/json;odata=verbose',
-                    'Content-Type': 'application/json;odata=verbose',
-                    'X-HTTP-Method': 'MERGE',
-                    'If-Match': '*'
-                },
-                body: JSON.stringify(updateData),
-                rejectUnauthorized: false
-            }, (err, res) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(res);
-                }
-            });
-        });
-
-        if (!response || !response.body) {
-            throw new Error('No response body received from SharePoint');
+        if (items.length === 0) {
+            return { success: false, changes: 0, message: 'Request not found' };
         }
 
-        const responseBody = JSON.parse(response.body);
-        return responseBody;
+        const itemId = items[0].Id;
+
+        const updateData = {};
+        if (data.status !== undefined) updateData.Status = data.status;
+        if (data.assignedTo !== undefined) updateData.AssignedTo = data.assignedTo ? { results: [data.assignedTo] } : null;
+        if (data.comments !== undefined) updateData.Comments = data.comments;
+        if (data.reviewer !== undefined) updateData.Reviewer = data.reviewer ? { results: [data.reviewer] } : null;
+        if (data.initiator !== undefined) updateData.Initiator = data.initiator;
+        if (data.requestedBy !== undefined) updateData.RequestedBy = data.requestedBy;
+        if (data.dateRequested !== undefined) updateData.DateRequested = data.dateRequested;
+        if (data.systemName !== undefined) updateData.SystemName = data.systemName;
+        if (data.policyFormComplete !== undefined) updateData.PolicyFormComplete = data.policyFormComplete ? true : false;
+        if (data.sopTrainingComplete !== undefined) updateData.SOPTrainingComplete = data.sopTrainingComplete ? true : false;
+
+        await sp.web.lists.getByTitle(listName).items.getById(itemId).update(updateData);
+        console.log('SharePoint Online: Updated change request:', requestId);
+        return { success: true, changes: 1 };
     } catch (error) {
-        console.error('Error updating SharePoint item:', error);
+        console.error('SharePoint Online updateChangeRequest error:', error.message);
         throw error;
     }
 }
 
-async function getChangeRequests(filter = '') {
+// Get all change requests from SharePoint Online
+async function getChangeRequests() {
     try {
-        let url = `${SHAREPOINT_CONFIG.siteUrl}/_api/web/lists/getbytitle('${SHAREPOINT_CONFIG.listName}')/items?$select=Id,Title,RequestID,RequestorName,RequestorEmail,Department,Summary,Description,ChangeType,Priority,Status,SubmittedDate,ApprovedDate,RejectedDate,Comments&$orderby=Id desc`;
-
-        if (filter) {
-            url += `&$filter=${encodeURIComponent(filter)}`;
-        }
-
-        const response = await new Promise((resolve, reject) => {
-            httpntlm.get({
-                url: url,
-                username: SHAREPOINT_CONFIG.username,
-                password: SHAREPOINT_CONFIG.password,
-                domain: SHAREPOINT_CONFIG.domain,
-                headers: {
-                    'Accept': 'application/json;odata=verbose'
-                },
-                rejectUnauthorized: false
-            }, (err, res) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(res);
-                }
-            });
-        });
-
-        if (!response || !response.body) {
-            throw new Error('No response body received from SharePoint');
-        }
-
-        const responseBody = JSON.parse(response.body);
-
-        // Transform SharePoint response to consistent format
-        return responseBody.d.results.map(item => ({
-            id: item.Id,
-            title: item.Title,
-            requestId: item.RequestID,
-            requestorName: item.RequestorName,
-            requestorEmail: item.RequestorEmail,
-            department: item.Department,
-            summary: item.Summary,
-            description: item.Description,
-            changeType: item.ChangeType,
-            priority: item.Priority,
-            status: item.Status,
-            submittedDate: item.SubmittedDate,
-            approvedDate: item.ApprovedDate,
-            rejectedDate: item.RejectedDate,
-            comments: item.Comments
-        }));
+        const items = await sp.web.lists.getByTitle(listName).items.get();
+        return items;
     } catch (error) {
-        console.error('Error fetching SharePoint items:', error);
+        console.error('SharePoint Online getChangeRequests error:', error.message);
         throw error;
     }
 }
 
+// Get change request by ID from SharePoint Online
 async function getChangeRequestById(id) {
     try {
-        const url = `${SHAREPOINT_CONFIG.siteUrl}/_api/web/lists/getbytitle('${SHAREPOINT_CONFIG.listName}')/items(${id})`;
-
-        const response = await new Promise((resolve, reject) => {
-            httpntlm.get({
-                url: url,
-                username: SHAREPOINT_CONFIG.username,
-                password: SHAREPOINT_CONFIG.password,
-                domain: SHAREPOINT_CONFIG.domain,
-                headers: {
-                    'Accept': 'application/json;odata=verbose'
-                },
-                rejectUnauthorized: false
-            }, (err, res) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(res);
-                }
-            });
-        });
-
-        if (!response || !response.body) {
-            throw new Error('No response body received from SharePoint');
-        }
-
-        const responseBody = JSON.parse(response.body);
-        const item = responseBody.d;
-        return {
-            id: item.Id,
-            title: item.Title,
-            requestId: item.RequestID,
-            requestorName: item.RequestorName,
-            requestorEmail: item.RequestorEmail,
-            department: item.Department,
-            summary: item.Summary,
-            description: item.Description,
-            changeType: item.ChangeType,
-            priority: item.Priority,
-            status: item.Status,
-            submittedDate: item.SubmittedDate,
-            approvedDate: item.ApprovedDate,
-            rejectedDate: item.RejectedDate,
-            comments: item.Comments
-        };
+        const item = await sp.web.lists.getByTitle(listName).items.getById(id).get();
+        return item;
     } catch (error) {
-        console.error('Error fetching SharePoint item:', error);
+        console.error('SharePoint Online getChangeRequestById error:', error.message);
         throw error;
-    }
-}
-
-async function testConnection() {
-    try {
-        // Use httpntlm for NTLM authentication (callback-based, so wrap in promise)
-        const url = `${SHAREPOINT_CONFIG.siteUrl}/_api/web/title`;
-
-        const response = await new Promise((resolve, reject) => {
-            httpntlm.get({
-                url: url,
-                username: SHAREPOINT_CONFIG.username,
-                password: SHAREPOINT_CONFIG.password,
-                domain: SHAREPOINT_CONFIG.domain,
-                headers: {
-                    'Accept': 'application/json;odata=verbose'
-                },
-                rejectUnauthorized: false
-            }, (err, res) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(res);
-                }
-            });
-        });
-
-        console.log('NTLM Response:', response); // Debug logging
-
-        // Check if response exists and has body
-        if (!response || !response.body) {
-            throw new Error('No response body received from SharePoint');
-        }
-
-        // Parse the JSON response body
-        const responseBody = JSON.parse(response.body);
-        return {
-            success: true,
-            siteTitle: responseBody.d.Title,
-            message: 'Successfully connected to SharePoint site using NTLM'
-        };
-    } catch (error) {
-        console.error('SharePoint connection test failed:', error);
-        return {
-            success: false,
-            error: error.message || 'NTLM authentication failed',
-            details: error
-        };
     }
 }
 
 module.exports = {
+    testConnection,
     createChangeRequest,
     updateChangeRequest,
     getChangeRequests,
-    getChangeRequestById,
-    testConnection
+    getChangeRequestById
 };

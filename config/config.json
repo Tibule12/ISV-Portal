@@ -1,0 +1,18 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/config.2.0.schema.json",
+  "version": "2.0",
+  "bundles": {
+    "change-control-portal-web-part": {
+      "components": [
+        {
+          "entrypoint": "./lib/webparts/changeControlPortal/ChangeControlPortalWebPart.js",
+          "manifest": "./src/webparts/changeControlPortal/ChangeControlPortalWebPart.manifest.json"
+        }
+      ]
+    }
+  },
+  "externals": {},
+  "localizedResources": {
+    "ChangeControlPortalWebPartStrings": "lib/webparts/changeControlPortal/loc/{locale}.js"
+  }
+}

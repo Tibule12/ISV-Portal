@@ -1,21 +1,23 @@
-// Simple localStorage-backed prototype logic
-const STORAGE_KEY = 'isv_change_requests_v1';
-const form = document.getElementById('requestForm');
-const tableBody = document.querySelector('#requestsTable tbody');
-const adminList = document.getElementById('adminList');
-const exportCsvBtn = document.getElementById('exportCsv');
-const resetBtn = document.getElementById('resetDemo');
-
-function loadRequests(){
-  try{
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-  }catch(e){return []}
+// API-backed prototype logic
+async function fetchRequests(filterStatus = '') {
+  try {
+    let url = '/api/requests';
+    if (filterStatus) {
+      url += `?status=${encodeURIComponent(filterStatus)}`;
+    }
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (e) {
+    console.error('Error fetching requests:', e);
+    return [];
+  }
 }
-function saveRequests(arr){localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));}
-function genId(){return 'REQ-'+Date.now().toString().slice(-6);} // simple id
 
-function renderTable(){
-  const items = loadRequests();
+async function renderTable() {
+  const items = await fetchRequests();
   tableBody.innerHTML = '';
   items.slice().reverse().forEach(it => {
     const tr = document.createElement('tr');
@@ -24,10 +26,10 @@ function renderTable(){
   });
 }
 
-function renderAdmin(filterStatus=''){
-  const items = loadRequests();
+async function renderAdmin(filterStatus = '') {
+  const items = await fetchRequests(filterStatus);
   adminList.innerHTML = '';
-  items.slice().reverse().filter(it => !filterStatus || it.status===filterStatus).forEach(it => {
+  items.slice().reverse().forEach(it => {
     const div = document.createElement('div');
     div.className = 'card';
     div.innerHTML = `<strong>${it.requestId} — ${escapeHtml(it.title)}</strong> <span class="status-badge">${escapeHtml(it.status)}</span>

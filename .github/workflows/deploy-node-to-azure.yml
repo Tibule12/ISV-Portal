@@ -1,0 +1,35 @@
+name: Deploy Node backend to Azure App Service
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+
+      - name: Install dependencies
+        working-directory: prototype/node_server
+        run: npm ci
+
+      - name: Build / test
+        working-directory: prototype/node_server
+        run: |
+          # if you have build/test steps add them here
+          echo "No build step defined"
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }} # set this in repository secrets
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }} # set as the publish profile
+          package: prototype/node_server
