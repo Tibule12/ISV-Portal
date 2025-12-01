@@ -48,6 +48,8 @@ Version|Date|Comments
   - **npm install**
   - **gulp serve**
 Note: If you open the repo in VS Code and see errors in `tsconfig.json` such as "extends file not found", run `npm ci` to install the Node dependencies (so the `extend` target exists), or use `tsconfig.editor.json` for lightweight editor validation while dependencies are not installed.
+
+Updated for remote push: small README update pushed to `tibule` main.
 If you want a SharePoint-only deployment with no Azure, see `docs/no-azure-deployment.md` for a shorter path using SharePoint lists and Power Automate / Power BI.
 
 > Include any additional steps as needed.
