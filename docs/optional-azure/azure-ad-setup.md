@@ -1,6 +1,10 @@
-This file has been moved to `docs/optional-azure/azure-ad-setup.md`.
+# Azure AD App Registration & Permissions — Backend + SPFx
 
-If you require Azure AD App Registration for your deployment, follow the documentation in `docs/optional-azure/azure-ad-setup.md` — otherwise ignore this for a SharePoint-only deployment.
+This guide explains how to register the Node.js backend with Azure AD, grant required Graph/SharePoint permissions, create a client secret, and wire those values into your Azure App Service (or local config during development).
+
+**Important security note**: Remove secrets from source control. Move secrets to Azure App Settings, Azure Key Vault, or GitHub secrets and never commit them to the repository.
+
+## 1) Backend (Node.js) App Registration (recommended)
 
 1. Sign in to the Azure portal → Azure Active Directory → App registrations → New registration.
 2. Name: `ISV Change Control Portal - backend` (example). Account types: choose `Single tenant` or as required.
@@ -35,9 +39,9 @@ You can set these via the Azure CLI like this:
 
 ```powershell
 az webapp config appsettings set -g myResourceGroup -n <YOUR_APP_NAME> --settings \
-  SHAREPOINT_ONLINE_CLIENT_ID="<CLIENT_ID>" \
-  SHAREPOINT_ONLINE_CLIENT_SECRET="<CLIENT_SECRET>" \
-  SHAREPOINT_ONLINE_TENANT_ID="<TENANT_ID>"
+	SHAREPOINT_ONLINE_CLIENT_ID="<CLIENT_ID>" \
+	SHAREPOINT_ONLINE_CLIENT_SECRET="<CLIENT_SECRET>" \
+	SHAREPOINT_ONLINE_TENANT_ID="<TENANT_ID>"
 ```
 
 Or use Managed Identities + Key Vault for better security: enable system-assigned managed identity on the App Service and store secrets in Key Vault.
@@ -64,3 +68,4 @@ If you want help, I can:
 
 - Scrub these secrets from Git history (using `git filter-repo` or BFG) — NOTE: this rewrites history and requires coordination with other developers.
 - Add GitHub Actions / Azure steps to use Key Vault references instead of committing secrets.
+

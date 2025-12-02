@@ -1,6 +1,6 @@
-This file has been moved to `docs/optional-azure/deploy-static.md`.
+# Deploy static prototype files to Azure Static Web Apps or Blob Storage
 
-If you wish to use Azure Static Web Apps or Azure Storage for the static prototype, see `docs/optional-azure/deploy-static.md` for optional instructions. For SharePoint-only usage, this is not required.
+This page describes two easy ways to host the `prototype` static files:
 
 ## Option A — Azure Static Web Apps (recommended for SPAs)
 

@@ -1,6 +1,6 @@
-This file has been moved to `docs/optional-azure/deploy-node.md`.
+# Deploy the Node.js backend to Azure App Service
 
-If you plan to host the Node.js backend in Azure App Service, please consult `docs/optional-azure/deploy-node.md` for full guidance; otherwise, skip it for a SharePoint-only deployment.
+This guide covers creating an Azure App Service for the Node/Express backend and deploying it using the GitHub Actions workflow included in `.github/workflows/deploy-node-to-azure.yml`.
 
 ## 1) Create an Azure App Service (quick manual steps)
 
@@ -42,7 +42,7 @@ Store the publish profile value in your GitHub repository secrets under the name
 
 ## 4) Trigger the GitHub Action
 
-- Push the config: the workflow `.github/workflows/deploy-node-to-azure.yml` will run automatically on push to `main`, or you can run it manually from the Actions tab.
+- Push the config: the workflow `.github/workflows/deploy-node-to-azure.yml` will run automatically on manual dispatch, or you can run it manually from the Actions tab.
 - The action installs dependencies and then deploys the folder `prototype/node_server` to the App Service.
 
 ### Local quick deploy (zip deploy)
@@ -56,5 +56,6 @@ az webapp deployment source config-zip --resource-group myResourceGroup --name <
 ```
 
 ## Notes
-- If the app must access Microsoft Graph or other Azure resources, register an App in Azure AD and grant permissions. See `docs/azure-ad-setup.md` (next step) for guidance.
+- If the app must access Microsoft Graph or other Azure resources, register an App in Azure AD and grant permissions. See `docs/optional-azure/azure-ad-setup.md` for guidance.
 - Confirm the App Service's Node runtime version matches dependencies; Node 18 is recommended for modern packages.
+

@@ -102,6 +102,21 @@ This extension illustrates the following concepts:
 - [Use Microsoft Graph in your solution](https://docs.microsoft.com/en-us/sharepoint/dev/spfx/web-parts/get-started/using-microsoft-graph-apis)
 - [Publish SharePoint Framework applications to the Marketplace](https://docs.microsoft.com/en-us/sharepoint/dev/spfx/publish-to-marketplace-overview)
 - [Microsoft 365 Patterns and Practices](https://aka.ms/m365pnp) - Guidance, tooling, samples and open-source controls for your Microsoft 365 development
+
+## Deploying the prototype to Azure Static Web Apps (optional)
+
+If you want to deploy the static prototype to Azure Static Web Apps, create an Azure Static Web App resource and add the provided `AZURE_STATIC_WEB_APPS_API_TOKEN` as a repository secret named `AZURE_STATIC_WEB_APPS_API_TOKEN`.
+
+If the secret is not set, the GitHub Actions workflow `deploy-static-prototype.yml` will skip the deployment step (this is intentional to avoid failing CI for forks or non-production runs).
+
+To add the secret:
+1. Open your GitHub repository → Settings → Secrets → Actions → New repository secret
+2. Set the name: `AZURE_STATIC_WEB_APPS_API_TOKEN`
+3. Paste the deployment token from the Azure portal for your Static Web App and save.
+
+After the secret is set, push to `main` and the workflow will automatically deploy the static artifacts from `prototype/`.
+
+Note: If you don't want to use Azure in this project, you can safely ignore the `docs/deploy-node.md` and `docs/deploy-static.md` instructions. The node backend and Azure deployments are optional — the SPFx web part will read from the SharePoint list directly and Power Automate can handle approvals and notifications without any Azure resources.
 =======
 # ISV-Portal
 >>>>>>> tibule/main
