@@ -76,7 +76,6 @@ Version|Date|Comments
   - **gulp serve**
 Note: If you open the repo in VS Code and see errors in `tsconfig.json` such as "extends file not found", run `npm ci` to install the Node dependencies (so the `extend` target exists), or use `tsconfig.editor.json` for lightweight editor validation while dependencies are not installed.
 
-Updated for remote push: small README update pushed to `tibule` main.
 If you want a SharePoint-only deployment with no Azure, see `docs/no-azure-deployment.md` for a shorter path using SharePoint lists and Power Automate / Power BI.
 
 > Include any additional steps as needed.
@@ -117,6 +116,3 @@ To add the secret:
 After the secret is set, push to `main` and the workflow will automatically deploy the static artifacts from `prototype/`.
 
 Note: If you don't want to use Azure in this project, you can safely ignore the `docs/deploy-node.md` and `docs/deploy-static.md` instructions. The node backend and Azure deployments are optional — the SPFx web part will read from the SharePoint list directly and Power Automate can handle approvals and notifications without any Azure resources.
-=======
-# ISV-Portal
->>>>>>> tibule/main
